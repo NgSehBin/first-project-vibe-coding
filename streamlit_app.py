@@ -1,6 +1,7 @@
 import os
 import requests  # standard library, no install neededimport streamlit as st
 import numpy as np
+import streamlit as st
 import torch
 import cv2
 from PIL import Image
@@ -12,6 +13,8 @@ import io
 CHECKPOINT_URL = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
 CHECKPOINT_PATH = "sam_vit_b_01ec64.pth"
 MODEL_TYPE = "vit_b"
+
+@st.cache_resource
 
 def load_model():
     """
