@@ -1,5 +1,5 @@
 import os
-import requests  # standard library, no install neededimport streamlit as st
+import requests  # pip install requests
 import numpy as np
 import streamlit as st
 import torch
