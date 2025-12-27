@@ -9,11 +9,6 @@ from streamlit_image_coordinates import streamlit_image_coordinates
 import io
 
 # --- CONFIGURATION ---
-st.set_page_config(page_title="Pro Background Remover", layout="wide")
-
-# ... (Previous imports remain the same)
-
-# --- CONFIGURATION ---
 CHECKPOINT_URL = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
 CHECKPOINT_PATH = "sam_vit_b_01ec64.pth"
 MODEL_TYPE = "vit_b"
