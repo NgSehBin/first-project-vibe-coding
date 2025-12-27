@@ -1,7 +1,8 @@
-timm
 streamlit
+rembg
 torch
 torchvision
+timm
 numpy
 opencv-python-headless
 Pillow
