@@ -1,5 +1,5 @@
 import os
-import requests  # pip install requests
+import requests
 import numpy as np
 import streamlit as st
 import torch
@@ -15,7 +15,6 @@ CHECKPOINT_PATH = "sam_vit_b_01ec64.pth"
 MODEL_TYPE = "vit_b"
 
 @st.cache_resource
-
 def load_model():
     """
     Loads the SAM model. 
@@ -72,6 +71,9 @@ try:
 except FileNotFoundError:
     st.error(f"Model file not found! Please download 'sam_vit_b_01ec64.pth' and place it in the project folder.")
     st.stop()
+except Exception as e:
+    st.error(f"An error occurred loading the model: {e}")
+    st.stop()
 
 # 2. File Uploader
 uploaded_file = st.file_uploader("Upload Image (PNG, JPG)", type=["png", "jpg", "jpeg"])
@@ -91,7 +93,6 @@ if uploaded_file is not None:
         st.info("Click a point on the image to select the subject to keep.")
         
         # This component captures the X, Y coordinates of the click
-        # We use a unique key to ensure it updates correctly
         value = streamlit_image_coordinates(image_pil, key="pil")
 
     with col2:
