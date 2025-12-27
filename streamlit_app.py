@@ -6,16 +6,34 @@ from PIL import Image
 from segment_anything import sam_model_registry, SamPredictor
 from streamlit_image_coordinates import streamlit_image_coordinates
 import io
-
+import os
+import requests  # standard library, no install needed
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Pro Background Remover", layout="wide")
-CHECKPOINT_PATH = "./sam_vit_b_01ec64.pth"  # Ensure this file exists
+
+# ... (Previous imports remain the same)
+
+# --- CONFIGURATION ---
+CHECKPOINT_URL = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
+CHECKPOINT_PATH = "sam_vit_b_01ec64.pth"
 MODEL_TYPE = "vit_b"
 
-# --- CACHED MODEL LOADING (Performance Optimization) ---
 @st.cache_resource
 def load_model():
-    """Loads the SAM model once to avoid reloading on every interaction."""
+    """
+    Loads the SAM model. 
+    Auto-downloads the model weights if they don't exist locally.
+    """
+    # 1. Check if model file exists, if not, download it
+    if not os.path.exists(CHECKPOINT_PATH):
+        st.info("Downloading AI Model (approx 375MB)... this may take a minute.")
+        response = requests.get(CHECKPOINT_URL, stream=True)
+        with open(CHECKPOINT_PATH, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        st.success("Download complete!")
+
+    # 2. Load the model
     device = "cuda" if torch.cuda.is_available() else "cpu"
     sam = sam_model_registry[MODEL_TYPE](checkpoint=CHECKPOINT_PATH)
     sam.to(device=device)
