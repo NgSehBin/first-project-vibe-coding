@@ -1,126 +1,146 @@
-import os
-import requests
-import numpy as np
 import streamlit as st
-import torch
-import cv2
+import numpy as np
 from PIL import Image
-# We now import from mobile_sam instead of segment_anything
+import io
+import requests
+import os
+import torch
+import gc # Garbage Collection
+
+# --- LIBRARIES FOR MODES ---
+from rembg import remove # The new "Auto" library
 from mobile_sam import sam_model_registry, SamPredictor
 from streamlit_image_coordinates import streamlit_image_coordinates
-import io
-import gc
 
 # --- CONFIGURATION ---
-# We use the MobileSAM model (40MB) instead of the heavy one (375MB)
+st.set_page_config(page_title="Pro Background Remover", layout="centered")
+
+# --- CACHING THE MANUAL MODEL (MobileSAM) ---
+# We keep this for the manual tab, but only load it if needed
 CHECKPOINT_URL = "https://github.com/ChaoningZhang/MobileSAM/blob/master/weights/mobile_sam.pt?raw=true"
 CHECKPOINT_PATH = "mobile_sam.pt"
-MODEL_TYPE = "vit_t"
-
-st.set_page_config(page_title="Lightweight Background Remover", layout="centered")
 
 @st.cache_resource
-def load_model():
-    """Loads the MobileSAM model. Small, fast, and crash-proof."""
-    status_msg = st.empty()
-    
+def load_manual_model():
+    """Loads the MobileSAM model only when Manual Mode is used."""
     if not os.path.exists(CHECKPOINT_PATH):
-        status_msg.info("Downloading Lightweight AI (40MB)...")
-        try:
+        with st.spinner("Downloading Manual Model..."):
             response = requests.get(CHECKPOINT_URL)
             with open(CHECKPOINT_PATH, "wb") as f:
                 f.write(response.content)
-            status_msg.empty()
-        except Exception as e:
-            st.error(f"Download failed: {e}")
-            st.stop()
-
-    try:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        # MobileSAM uses 'vit_t'
-        sam = sam_model_registry[MODEL_TYPE](checkpoint=CHECKPOINT_PATH)
-        sam.to(device=device)
-        sam.eval() # Force evaluation mode for speed
-        predictor = SamPredictor(sam)
-        return predictor
-    except Exception as e:
-        st.error(f"Error loading model: {e}")
-        st.stop()
-
-def process_image(image_pil):
-    """Resizes huge images to safe limits (800px) to protect RAM."""
-    max_dimension = 800
-    if max(image_pil.size) > max_dimension:
-        image_pil.thumbnail((max_dimension, max_dimension), Image.LANCZOS)
     
-    return np.array(image_pil.convert("RGB")), image_pil
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    sam = sam_model_registry["vit_t"](checkpoint=CHECKPOINT_PATH)
+    sam.to(device=device)
+    sam.eval()
+    return SamPredictor(sam)
 
-def remove_background(image_np, mask):
-    """Applies the mask to create transparency."""
-    h, w, _ = image_np.shape
-    alpha_channel = np.zeros((h, w), dtype=np.uint8)
-    alpha_channel[mask] = 255
-    b, g, r = cv2.split(image_np)
-    rgba = [b, g, r, alpha_channel]
-    return cv2.merge(rgba, 4)
+# --- HELPER FUNCTIONS ---
+def convert_image(image_pil):
+    """Converts PIL to Bytes for download."""
+    buf = io.BytesIO()
+    image_pil.save(buf, format="PNG")
+    return buf.getvalue()
 
-# --- UI START ---
-st.title("⚡ Fast Background Remover")
-st.markdown("Upload image -> Click object -> Download.")
+def resize_image(image_pil, max_size=1024):
+    """Resizes image to prevent memory crashes."""
+    if max(image_pil.size) > max_size:
+        image_pil.thumbnail((max_size, max_size), Image.LANCZOS)
+    return image_pil
 
-# 1. Load Model (Cached)
-predictor = load_model()
+# --- APP UI ---
+st.title("✂️ Pro Background Remover")
 
-# 2. Upload
-uploaded_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"])
+# Create Tabs
+tab1, tab2 = st.tabs(["🤖 Auto Mode (Fast)", "👆 Manual Click (Precise)"])
 
-if uploaded_file is not None:
-    # Prepare image
-    raw_image = Image.open(uploaded_file)
-    image_np, image_pil = process_image(raw_image)
+# --- TAB 1: AUTO MODE (REMBG) ---
+with tab1:
+    st.header("One-Click Auto Removal")
+    st.info("Best for: People, Products, and Cars. Detects the whole object automatically.")
     
-    # Clean memory
-    gc.collect()
+    auto_file = st.file_uploader("Upload Image for Auto-Remove", type=["png", "jpg", "jpeg"], key="auto")
+    
+    if auto_file:
+        image = Image.open(auto_file)
+        image = resize_image(image)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.image(image, caption="Original", use_container_width=True)
+            
+        # The Magic Button
+        if st.button("🚀 Remove Background", type="primary"):
+            with st.spinner("AI is detecting the subject..."):
+                try:
+                    # REMBG handles the heavy lifting here
+                    output_image = remove(image)
+                    
+                    with col2:
+                        st.image(output_image, caption="Result", use_container_width=True)
+                        
+                        # Download
+                        st.download_button(
+                            label="⬇️ Download Result",
+                            data=convert_image(output_image),
+                            file_name="auto_removed.png",
+                            mime="image/png"
+                        )
+                except Exception as e:
+                    st.error(f"Error: {e}")
 
-    # Embed image (The heavy part)
-    with st.spinner("Analyzing image..."):
+# --- TAB 2: MANUAL MODE (MobileSAM) ---
+with tab2:
+    st.header("Manual Click Selection")
+    st.info("Best for: Selecting a specific item in a group (e.g., one apple in a basket).")
+    
+    manual_file = st.file_uploader("Upload Image for Manual Click", type=["png", "jpg", "jpeg"], key="manual")
+
+    if manual_file:
+        # Load Model only now to save RAM
+        predictor = load_manual_model()
+        
+        raw_image = Image.open(manual_file)
+        raw_image = resize_image(raw_image, max_size=800)
+        image_np = np.array(raw_image.convert("RGB"))
+        
+        # Prepare Predictor
         predictor.set_image(image_np)
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("1. Click Object")
-        # Capture click
-        value = streamlit_image_coordinates(image_pil, key="pil")
-
-    with col2:
-        st.subheader("2. Result")
-        if value:
-            # Get coordinates
-            input_point = np.array([[value["x"], value["y"]]])
-            input_label = np.array([1])
-
-            # Predict
-            masks, _, _ = predictor.predict(
-                point_coords=input_point,
-                point_labels=input_label,
-                multimask_output=False,
-            )
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**Click the object:**")
+            value = streamlit_image_coordinates(raw_image, key="pil_manual")
             
-            # Create Output
-            result_image = remove_background(image_np, masks[0])
-            result_pil = Image.fromarray(result_image)
-            
-            st.image(result_pil, use_container_width=True)
-            
-            # Download
-            buf = io.BytesIO()
-            result_pil.save(buf, format="PNG")
-            st.download_button(
-                label="⬇️ Download PNG",
-                data=buf.getvalue(),
-                file_name="cutout.png",
-                mime="image/png"
-            )
-        else:
-            st.info("👆 Click the left image to start.")
+        with col2:
+            if value:
+                # Process Click
+                input_point = np.array([[value["x"], value["y"]]])
+                input_label = np.array([1])
+                
+                masks, _, _ = predictor.predict(
+                    point_coords=input_point,
+                    point_labels=input_label,
+                    multimask_output=False
+                )
+                
+                # Apply Mask
+                mask = masks[0]
+                h, w, _ = image_np.shape
+                alpha = np.zeros((h, w), dtype=np.uint8)
+                alpha[mask] = 255
+                b, g, r = cv2.split(image_np) # Use OpenCV usually, but simple merge works too
+                import cv2 # Ensure cv2 is imported inside scope if needed
+                rgba = [b, g, r, alpha]
+                result_cv2 = cv2.merge(rgba, 4)
+                
+                result_pil = Image.fromarray(result_cv2)
+                st.image(result_pil, caption="Selected Crop", use_container_width=True)
+                
+                st.download_button(
+                    label="⬇️ Download Crop",
+                    data=convert_image(result_pil),
+                    file_name="manual_crop.png",
+                    mime="image/png"
+                )
