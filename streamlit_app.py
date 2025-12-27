@@ -13,7 +13,6 @@ CHECKPOINT_URL = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec
 CHECKPOINT_PATH = "sam_vit_b_01ec64.pth"
 MODEL_TYPE = "vit_b"
 
-@st.cache_resource
 def load_model():
     """
     Loads the SAM model. 
