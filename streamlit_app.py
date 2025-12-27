@@ -1,4 +1,5 @@
-import streamlit as st
+import os
+import requests  # standard library, no install neededimport streamlit as st
 import numpy as np
 import torch
 import cv2
@@ -6,8 +7,7 @@ from PIL import Image
 from segment_anything import sam_model_registry, SamPredictor
 from streamlit_image_coordinates import streamlit_image_coordinates
 import io
-import os
-import requests  # standard library, no install needed
+
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Pro Background Remover", layout="wide")
 
