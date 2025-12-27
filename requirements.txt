@@ -1,0 +1,8 @@
+streamlit
+torch
+torchvision
+numpy
+opencv-python-headless
+Pillow
+segment-anything
+streamlit-image-coordinates
