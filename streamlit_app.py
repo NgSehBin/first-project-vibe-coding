@@ -68,11 +68,8 @@ st.markdown("### Upload an image, click the subject, and download the result.")
 try:
     with st.spinner("Loading AI Model... (This happens once)"):
         predictor = load_model()
-except FileNotFoundError:
-    st.error(f"Model file not found! Please download 'sam_vit_b_01ec64.pth' and place it in the project folder.")
-    st.stop()
 except Exception as e:
-    st.error(f"An error occurred loading the model: {e}")
+    st.error(f"Error loading model: {e}")
     st.stop()
 
 # 2. File Uploader
